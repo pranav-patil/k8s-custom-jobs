@@ -1,0 +1,89 @@
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+
+# Folders
+_obj
+_test
+
+# Backup files
+*.bak
+*.swp
+*.swo
+
+# Editor files
+*.sublime-project
+*.sublime-workspace
+*.vscode
+*.idea
+
+# Compiled Output
+dist/
+tmp/
+out-tsc/
+bazel-out/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Terraform Compiled files
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.tfplan.*
+*.terraform.lock.hcl
+
+# Terraform directories
+.terraform/
+.terragrunt-cache/
+
+# Terragrunt directories
+.terragrunt-home/
+
+
+# Serverless
+admin.env
+.env
+_meta
+.serverless/
+serverless.local.yml
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.pid
+
+# Test binary, built with `go test -c`
+*.test
+
+# Mock
+*_mock.go
+**/mocks/
+
+# Output of the coverage tool, specifically when used with LiteIDE
+*.out
+
+# emacs
+*~
+\#*\#
+.\#*
+
+# Go workspace file
+go.work
+
+bin/
+**/volume/
+**/function
+*.zip
+**/bootstrap
+
+# Logs
+*.log
