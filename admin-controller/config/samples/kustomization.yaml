@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- emprovise_v1_admin.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

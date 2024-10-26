@@ -1,0 +1,9 @@
+apiVersion: emprovise.emprovise.com/v1
+kind: Admin
+metadata:
+  labels:
+    app.kubernetes.io/name: admin-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: admin-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - emprovise.emprovise.com
+  resources:
+  - admins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - emprovise.emprovise.com
+  resources:
+  - admins/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - emprovise.emprovise.com
+  resources:
+  - admins/status
+  verbs:
+  - get
+  - patch
+  - update

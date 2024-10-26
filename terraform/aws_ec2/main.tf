@@ -158,17 +158,46 @@ resource "aws_instance" "ec2_instance" {
   user_data = file("setup.sh")
   associate_public_ip_address = true
 
-  connection {
-    type        = "ssh"
-    host        = self.public_ip
-    user        = "ubuntu"
-
-    # Mention the exact private key name which will be generated
-    private_key = file(local_file.ssh_private_key.filename)
-    timeout     = "4m"
+  root_block_device {
+    volume_size = 50  # Increase root volume size to 50 GB
+    volume_type = "gp3"  # General Purpose SSD
+    delete_on_termination = true
   }
 
   tags = {
     Name = "${var.stack_name}_ec2_instance"
   }
 }
+
+# resource "null_resource" "setup_k8s_cluster" {
+#   depends_on = [aws_instance.ec2_instance]
+#
+#   connection {
+#     type        = "ssh"
+#     host        = aws_instance.ec2_instance.public_ip
+#     user        = "ubuntu"
+#     private_key = file(local_file.ssh_private_key.filename)
+#     timeout     = "4m"
+#   }
+#
+#   # wait to reboot and "handle it"
+#   provisioner "remote-exec" {
+#     on_failure = continue
+#     inline = [
+#       "set -o errexit",
+#       "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+#     ]
+#   }
+#
+#   provisioner "file" {
+#     source      = "init.sh"
+#     destination = "/home/ubuntu/init.sh"
+#   }
+#
+#   provisioner "remote-exec" {
+#     inline = [
+#       "chmod +x /home/ubuntu/init.sh",
+#       "sudo sh /home/ubuntu/init.sh"
+#     ]
+#   }
+# }

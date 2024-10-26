@@ -1,0 +1,23 @@
+# permissions for end users to view admins.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: admin-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: admin-viewer-role
+rules:
+- apiGroups:
+  - emprovise.emprovise.com
+  resources:
+  - admins
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - emprovise.emprovise.com
+  resources:
+  - admins/status
+  verbs:
+  - get

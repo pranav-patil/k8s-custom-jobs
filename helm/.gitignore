@@ -1,0 +1,6 @@
+*.swp
+*.bak
+*.tmp
+.idea/
+.DS_Store
+overrides.yaml
