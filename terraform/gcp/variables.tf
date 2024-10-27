@@ -1,4 +1,4 @@
-variable "gce_project" {
+variable "gcp_project" {
   type        = string
   description = "Determines the Google Cloud project to be used"
   default = "sample-project"
@@ -28,7 +28,7 @@ variable "node_pool_node_count" {
   default = 2
 }
 
-variable "gcp_region" {
+variable "region" {
   type        = string
   description = "The GCE location to be used. Defaults to us-central1-a"
   default = "us-east1"

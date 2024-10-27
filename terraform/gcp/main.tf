@@ -1,13 +1,13 @@
 # Configure the Google Cloud provider
 provider "google" {
-  project = var.gce_project
-  region  = var.gcp_region
+  project = var.gcp_project
+  region  = var.region
 }
 
 # Define a GKE cluster
 resource "google_container_cluster" "gke_cluster" {
   name     = "${var.stack_name}-gke-cluster"
-  location = var.gcp_region
+  location = var.region
 
   # Define the number of initial nodes and node configuration
   initial_node_count = 1           # Master node (control plane)
@@ -21,7 +21,7 @@ resource "google_container_cluster" "gke_cluster" {
 # k8s node pool
 resource "google_container_node_pool" "node_pool" {
   name       = "default-node-pool"
-  location   = var.gcp_region
+  location   = var.region
   cluster    = google_container_cluster.gke_cluster.name
   node_count = var.node_pool_node_count
 
