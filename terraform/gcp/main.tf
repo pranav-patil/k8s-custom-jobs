@@ -1,94 +1,48 @@
+# Configure the Google Cloud provider
 provider "google" {
-  project = var.project_id
-  region  = var.region
+  project = var.gce_project
+  region  = var.gcp_region
 }
 
-# Define the GKE Cluster
-resource "google_container_cluster" "primary" {
-  name     = var.cluster_name
-  location = var.region
+# Define a GKE cluster
+resource "google_container_cluster" "gke_cluster" {
+  name     = "${var.stack_name}-gke-cluster"
+  location = var.gcp_region
 
-  # Number of nodes in the default pool
-  initial_node_count = 1
+  # Define the number of initial nodes and node configuration
+  initial_node_count = 1           # Master node (control plane)
+  remove_default_node_pool = true  # Remove the default node pool
+  deletion_protection = false       # Set deletion protection to false
 
-  # Define the control plane settings
-  remove_default_node_pool = true
-  node_locations = [var.region]
-
-  # Kubernetes version
-  min_master_version = "1.27.2-gke.1200"
-
-  # Network settings
-  network    = "default"
-  subnetwork = "default"
+  # Enable IP aliasing for VPC-native clusters
+  ip_allocation_policy {}
 }
 
-# Define a separate node pool (worker nodes) for the cluster
-resource "google_container_node_pool" "primary_nodes" {
-  cluster    = google_container_cluster.primary.name
-  location   = var.region
-  node_count = var.node_count
+# k8s node pool
+resource "google_container_node_pool" "node_pool" {
+  name       = "default-node-pool"
+  location   = var.gcp_region
+  cluster    = google_container_cluster.gke_cluster.name
+  node_count = var.node_pool_node_count
 
-  # Node configuration (worker nodes)
   node_config {
-    preemptible  = var.use_preemptible_nodes
-    machine_type = var.node_machine_type
-
-    # Enable auto-scaling for the node pool
+    preemptible  = false
+    machine_type = "n1-standard-2" # pricing: https://cloud.google.com/compute/vm-instance-pricing#n1_predefined
     oauth_scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+#       "https://www.googleapis.com/auth/monitoring",
+#       # Grants Read Access to GCR to clusters
+#       "https://www.googleapis.com/auth/devstorage.read_only",
       "https://www.googleapis.com/auth/cloud-platform",
     ]
-    metadata = {
-      disable-legacy-endpoints = "true"
-    }
     labels = {
-      environment = var.environment
+      type = "nfs"
     }
-    tags = ["gke-node", var.environment]
-
-    # Set disk size for worker nodes
-    disk_size_gb = 100
+    tags = [var.stack_name]
   }
 
-  # Enable autoscaling for the node pool
-  autoscaling {
-    min_node_count = 1
-    max_node_count = 5
-  }
+    autoscaling {
+      min_node_count = 1
+      max_node_count = 3
+    }
 }
-
-# Output the cluster's credentials to use with kubectl
-output "kubernetes_cluster_name" {
-  value = google_container_cluster.primary.name
-}
-
-output "kubernetes_cluster_endpoint" {
-  value = google_container_cluster.primary.endpoint
-}
-
-output "kubernetes_cluster_ca_certificate" {
-  value = google_container_cluster.primary.master_auth.0.cluster_ca_certificate
-}
-
-output "kubernetes_cluster_password" {
-  value = google_container_cluster.primary.master_auth.0.password
-}
-
-output "kubernetes_cluster_username" {
-  value = google_container_cluster.primary.master_auth.0.username
-}
-
-# VPC for the cluster (Optional - If you want to use a custom VPC)
-resource "google_compute_network" "custom_vpc" {
-  name = "gke-network"
-  auto_create_subnetworks = false
-}
-
-# Define subnet for the cluster (Optional - If using a custom subnet)
-resource "google_compute_subnetwork" "custom_subnet" {
-  name          = "gke-subnet"
-  ip_cidr_range = "10.0.0.0/16"
-  network       = google_compute_network.custom_vpc.name
-  region        = var.region
-}
-

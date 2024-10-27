@@ -1,40 +1,36 @@
-variable "project_id" {
-  description = "The ID of the GCP project."
+variable "gce_project" {
   type        = string
+  description = "Determines the Google Cloud project to be used"
+  default = "sample-project"
 }
 
-variable "region" {
-  description = "The GCP region where the cluster will be created."
-  type        = string
-  default     = "us-central1"
+variable "stack_name" {
+  description = "Name of the GKE cluster - will be used to name all created resources"
+  default     = "emprovise"
 }
 
-variable "cluster_name" {
-  description = "The name of the GKE cluster."
+variable "k8s_version_prefix" {
   type        = string
-  default     = "my-gke-cluster"
+  # Docs recommend to not use fuzzy version here:
+  # https://www.terraform.io/docs/providers/google/r/container_cluster.html
+  # OTOH google deprecates support for specific version rather fast.
+  # Resulting in "Error 400: Master version "X" is unsupported., badRequest"
+  # So we use a version prefix hoping that the stable patch versions won't do unexpected things (which is unlikely!)
+  description = "Master and Node version prefix to setup"
+
+  # When updating please also adapt in Dockerfile, init-cluster.sh and ApplicationConfigurator.groovy
+  default = "latest"
 }
 
-variable "node_count" {
-  description = "The number of worker nodes in the cluster."
+variable "node_pool_node_count" {
   type        = number
-  default     = 2
+  description = "Number of initial nodes for default node pool"
+  default = 2
 }
 
-variable "node_machine_type" {
-  description = "The machine type to use for worker nodes."
+variable "gcp_region" {
   type        = string
-  default     = "n1-standard-1"
+  description = "The GCE location to be used. Defaults to us-central1-a"
+  default = "us-east1"
 }
 
-variable "use_preemptible_nodes" {
-  description = "Use preemptible VMs for worker nodes to reduce cost."
-  type        = bool
-  default     = false
-}
-
-variable "environment" {
-  description = "Environment label (e.g. 'dev', 'prod')."
-  type        = string
-  default     = "dev"
-}
