@@ -5,19 +5,11 @@
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 
-# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
-image:
-  repository: nginx
-  # This sets the pull policy for images.
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
-
 # This is for the secretes for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
 # This is to override the chart name.
 nameOverride: ""
-fullnameOverride: ""
+fullnameOverride: "k8s-scanner"
 
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
@@ -31,9 +23,51 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-# This is for setting Kubernetes Annotations to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-podAnnotations: {}
+  adminController:
+    ## The name of the service account to use.
+    ## If not set and create is true, a name is generated using the fullname of oversight template
+    name: 'admin-controller'
+
+    ## Annotations to add to the service account
+    annotations: {}
+
+    ## Size of the buffer that will receive mitigation requests
+    ##
+    ## Default value: 50
+    mitigationHandlerBufferSize: 50
+
+    ## Security context constraints to add to the service account
+    securityContextConstraints:
+      allowHostDirVolumePlugin: false
+      allowHostIPC: false
+      allowHostNetwork: false
+      allowHostPID: false
+      allowHostPorts: false
+      allowPrivilegedContainer: false
+      allowedCapabilities: []
+      apiVersion: security.openshift.io/v1
+      defaultAddCapabilities: []
+      kind: SecurityContextConstraints
+      priority:
+      readOnlyRootFilesystem: false
+      requiredDropCapabilities: []
+      runAsUser:
+        type: RunAsAny
+      seLinuxContext:
+        type: MustRunAs
+      supplementalGroups:
+        type: RunAsAny
+      seccompProfiles:
+        - '*'
+
+  scout:
+    ## The name of the service account to use.
+    ## If not set and create is true, a name is generated using the fullname of scout template
+    name: ''
+
+    ## Annotations to add to the service account
+    annotations: {}
+
 # This is for setting Kubernetes Labels to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
@@ -41,13 +75,51 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+## securityContext specifies the security contexts that we'll apply to the pods.
+##
+securityContext:
+  ## enabled is a global flag controlling whether security contexts are included at all in the manifest
+  ## Default value: true
+  enabled: true
+
+  ## default is the default security context that we'll apply at the pod and container level.
+  ## if `securityContext.enabled` is true, the `pod` value will be inserted into the `Deployment` manifest
+  ## as part of the pod template and the `container` value will be inserted at the container level.
+  default:
+    pod:
+      runAsNonRoot: true
+    container:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      # seLinuxOptions: "If unspecified, the container runtime will allocate a random SELinux context for each container": this seems appropriate.
+      runAsUser: 65532 # nonroot user
+  scanner:
+    pod:
+      runAsNonRoot: true
+    target:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+        add: []
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: false
+      runAsUser: 0 #root user
+    init:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532 # nonroot user
 
 # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
 service:
@@ -73,7 +145,23 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
-resources: {}
+resources:
+  defaults: {}
+  falco:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+  adminController:
+    requests:
+      cpu: 100m
+      memory: 20Mi
+    limits:
+      cpu: 800m
+      memory: 1Gi
+
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -116,8 +204,150 @@ volumeMounts: []
 #   mountPath: "/etc/foo"
 #   readOnly: true
 
-nodeSelector: {}
+nodeSelector:
+  ## nodeSelector if set, ensures pods are only assigned to a particular set of nodes.
+  ## Defaults apply to all pods created by this chart unless overridden by a non default configuration.
+  ##
+  ## Default Value: {}
+  defaults: {}
 
-tolerations: []
+tolerations:
+  ## tolerations if set, allows (but does not require) the pods to schedule onto nodes with matching taints.
+  ## Defaults apply to all pods created by this chart unless overridden by a non default configuration.
+  ##
+  ## Default Value: {}
+  defaults: []
 
-affinity: {}
+affinity:
+  ## affinity if set, provides the ability constrain which nodes your pod is eligible to be scheduled on, based on labels.
+  ## Defaults apply to all pods created by this chart unless overridden by a non default configuration.
+  ##
+  ## Default Value: {}
+  defaults: {}
+
+## replicas if set, allows for additional replica counts to be set for specified pods.
+## NOTE: replicas does not apply to scout
+##
+## Default Value: {}
+replicas: {}
+
+## extraLabels is a dictionary of additional labels that will be added to all resources created by this chart.
+##
+## Default Value: {}
+extraLabels: {}
+
+podAnnotations:
+  ## podAnnotations if set, applies additional pod annotations to all pods unless overridden by a non default configuration.
+  ##
+  ## Default Value: {}
+  defaults: {}
+
+priorityClassName:
+  ## podAnnotations if set, applies priority class to all pods unless overridden by a non default configuration.
+  ##
+  ## Default Value: (none)
+  default:
+
+# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+images:
+  defaults:
+    ## Default registry to pull images from. This can be overridden for
+    ## each image by specifying the registry attribute at the image level.
+    ## If no registry is provided, images will be pulled from your default
+    ## registry (which may be Amazon ECR Public Gallery).
+    ##
+    ## The images can also be accessed in Docker Hub by leaving the registry field blank.
+    # registry:
+    ##
+    ## Default value: public.ecr.aws
+    registry: public.ecr.aws
+
+    repository: nginx
+
+    ## Default project / organization to pull images from. This can be
+    ## overridden for each image by specifying the project attribute at the
+    ## image level.
+    ##
+    project: emprovise/k8s-custom-jobs
+
+    ## Default tag for images to pull. This can be overridden for each image
+    ## by specifying the tag attribute at the image level.
+    tag: 1.0.0
+
+    ## Default pull policy for images. This can be overridden for each image
+    ## by specifying the pullPolicy attribute at the image level.
+    ##
+    ## Default value: IfNotPresent
+    pullPolicy: IfNotPresent
+
+    ## Default secret for pulling images. This can be overridden for each
+    ## image by specifying the imagePullSecret attribute at the image level.
+    ##
+    ## Default value: none
+    # imagePullSecret:
+  adminController:
+    repository: admin-controller
+    digest: sha256:834c63f071e0a2aac5ae9d694106966bbe3dcea557234edefbb781904cec869d
+
+adminController:
+  enabled: true
+
+  ## syncPeriod is the time interval when Emprovise Cloud Scanner will evaluate the running pods.
+  ##
+  ## Default value: 3600s
+  ## Minimum value: 600s
+  ##
+  syncPeriod: 3600s
+
+  ## pageSize is the maximum page size when fetching list of pods.
+  ##
+  ## Default value: 100
+  ## Minimum value: 1
+  ##
+  pageSize: 100
+
+  ## enableNetworkPolicyCreation will tell the Oversight controller to create the Kubernetes network policy if it doesn't exist.
+  ## The created network policy is used to perform `isolate` mitigation. The created network policy will not get cleaned up automatically.
+  ##
+  ## Default value: true
+  ##
+  enableNetworkPolicyCreation: true
+
+tlsConfig:
+  ## minTLSVersion is the minimum TLS version that the server will accept.
+  ## Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.
+  ##
+  ## Default value: VersionTLS12
+  minTLSVersion: VersionTLS12
+
+  ## cipherSuites is a list of supported secure go cipher suites for TLS 1.2 and 1.3.
+  ## The list of supported cipher suites can be found at https://golang.org/pkg/crypto/tls/#pkg-constants
+  ##
+  ## Default value: List of secure cipher suites
+  cipherSuites:
+    - TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA
+    - TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
+    - TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+    - TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+    - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+    - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+    - TLS_AES_128_GCM_SHA256
+    - TLS_AES_256_GCM_SHA384
+    - TLS_CHACHA20_POLY1305_SHA256
+
+rbac:
+  # Create and use rbac resources
+  create: true
+
+networkPolicy:
+  ## enabled the network policy.
+  ##
+  ## Default value: true
+  enabled: true
+  ## k8s-metacollector network policy, default false
+  k8sMetaCollector:
+    enabled: false

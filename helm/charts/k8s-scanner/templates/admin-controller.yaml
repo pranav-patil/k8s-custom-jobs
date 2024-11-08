@@ -1,0 +1,289 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-controller
+  labels:
+    {{- include "adminController.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ default 1 .Values.replicas.adminController }}
+  selector:
+    matchLabels:
+      {{- include "adminController.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+{{- with (default .Values.podAnnotations.defaults .Values.podAnnotations.adminController) }}
+{{- toYaml . | nindent 8 }}
+{{- end }}
+      labels:
+        {{- include "adminController.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "adminController.serviceAccountName" . }}
+{{- $securityContextEnabled := .Values.securityContext.enabled }}
+{{- $securityContext := default .Values.securityContext.default .Values.securityContext.adminController }}
+{{- $podSecurityContext := default .Values.securityContext.default.pod $securityContext.pod }}
+{{- $containerSecurityContext := default .Values.securityContext.default.container $securityContext.container.adminController }}
+{{- if $securityContextEnabled }}
+      securityContext:
+{{ toYaml $podSecurityContext | indent 8 }}
+{{- end }}
+      {{- $imageDefaults := .Values.images.defaults }}
+      {{- with .Values.images.adminController }}
+      {{- $secret := (default (default "" $imageDefaults.imagePullSecret) .imagePullSecret) }}
+      {{- if not (eq "" $secret) }}
+      imagePullSecrets:
+        - name: {{ $secret | quote }}
+      {{- end }}
+      containers:
+      - name: admin-controller
+{{- if $securityContextEnabled }}
+        securityContext:
+{{ toYaml $containerSecurityContext | indent 12 }}
+{{- end }}
+        {{- $project := (default (default "emprovise-k8s-scans" $imageDefaults.project) .project) }}
+        {{- $repository := printf "%s/%s" $project (required ".repository is required!" .repository) }}
+        {{- $tag := (default $imageDefaults.tag .tag) }}
+        image: {{ include "image.source" (dict "repository" $repository "registry" .registry "tag" $tag "imageDefaults" $imageDefaults "digest" .digest) }}
+        imagePullPolicy: {{ default (default "Always" $imageDefaults.pullPolicy) .pullPolicy }}
+        {{- end }}
+        ports:
+          - containerPort: 8070
+        volumeMounts:
+          - name: workdir
+            mountPath: /var/adminController
+          - name: api-key
+            mountPath: /secrets
+          - name: kube-bench-job-template
+            mountPath: /etc/config
+        args:
+        - --tls-min-version={{ include "tlsConfig.minTLSVersion" .Values.tlsConfig }}
+        - --tls-cipher-suites={{ include "tlsConfig.cipherSuites" .Values.tlsConfig }}
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --kube-scan-bind-address=:8070
+        - --leader-elect
+        - --mitigation-handler-buffer-size={{ default 50 .Values.adminController.mitigationHandlerBufferSize }}
+        - --page-size={{ default 100 .Values.adminController.pageSize }}
+        - --sync-period={{ default "3600s" .Values.adminController.syncPeriod }}
+        - --job-template-path=/etc/config/kube-bench-job-template.yaml
+        - --excluded-namespaces=kube-system
+        - --network-policy-label={{ default "emprovise" .Release.Name }}
+        - --application-version=$(APPLICATION_VERSION)
+        {{- if (eq .Values.adminController.enableNetworkPolicyCreation false) }}
+        - --enable-network-policy-creation=false
+        {{- end }}
+        command:
+        - /manager
+        env:
+        - name: APPLICATION_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+{{ toYaml (default .Values.resources.defaults .Values.resources.adminController) | indent 12 }}
+      terminationGracePeriodSeconds: 10
+      nodeSelector:
+{{ toYaml (default .Values.nodeSelector.defaults .Values.nodeSelector.adminController) | indent 8 }}
+      tolerations:
+{{ toYaml (default .Values.tolerations.defaults .Values.tolerations.adminController) | indent 8 }}
+      affinity:
+{{ toYaml (default .Values.affinity.defaults .Values.affinity.adminController) | indent 8 }}
+{{- $classname := (default (default "" .Values.priorityClassName.default ) .Values.priorityClassName.adminController) }}
+{{- if not (eq "" $classname) }}
+      priorityClassName: "{{ $classname }}"
+{{- end }}
+      restartPolicy: Always
+      volumes:
+        - name: workdir
+          emptyDir:
+            sizeLimit: 50Mi
+        - name: api-key
+          secret:
+            secretName: {{ template "k8s-scanner.fullname" . }}-auth
+        - name: kube-bench-job-template
+          configMap:
+            name: {{ template "k8s-scanner.name" . }}-adminController-controller-config
+            items:
+              - key: kube-bench-job-template.yaml
+                path: kube-bench-job-template.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{- include "adminController.labels" . | nindent 4 }}
+  name: emprovise-admin-controller-controller-metrics-service
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    {{- include "adminController.selectorLabels" . | nindent 4 }}
+
+{{ if .Values.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-controller-controller-networkpolicy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "adminController.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "adminController.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from: # any -- this is for metrics
+      ports:
+        - protocol: TCP
+          port: 8443
+    - from: # any -- this should just be kubelet for health probes
+      ports:
+        - protocol: TCP
+          port: 8081
+    - from: # allows traffic from kube bench jobs
+      - podSelector:
+          matchLabels:
+            {{- include "kubeBenchJob.selectorLabels" . | nindent 12 }}
+      ports:
+        - protocol: TCP
+          port: 8070
+{{- end }}
+
+{{ if .Values.serviceAccount.create }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "adminController.serviceAccountName" . }}
+  labels:
+    {{- include "adminController.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.adminController.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "k8s-scanner.name" . }}-admin-controller-controller-config
+  labels:
+    {{- include "adminController.labels" . | nindent 4 }}
+data:
+  kube-bench-job-template.yaml: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: kube-bench
+    spec:
+      template:
+        metadata:
+          labels:
+            app: kube-bench
+        spec:
+          containers:
+            - command: ["kube-bench"]
+              image: docker.io/aquasec/kube-bench:latest
+              name: kube-bench
+              volumeMounts:
+                - name: var-lib-cni
+                  mountPath: /var/lib/cni
+                  readOnly: true
+                - mountPath: /var/lib/etcd
+                  name: var-lib-etcd
+                  readOnly: true
+                - mountPath: /var/lib/kubelet
+                  name: var-lib-kubelet
+                  readOnly: true
+                - mountPath: /var/lib/kube-scheduler
+                  name: var-lib-kube-scheduler
+                  readOnly: true
+                - mountPath: /var/lib/kube-controller-manager
+                  name: var-lib-kube-controller-manager
+                  readOnly: true
+                - mountPath: /etc/systemd
+                  name: etc-systemd
+                  readOnly: true
+                - mountPath: /lib/systemd/
+                  name: lib-systemd
+                  readOnly: true
+                - mountPath: /srv/kubernetes/
+                  name: srv-kubernetes
+                  readOnly: true
+                - mountPath: /etc/kubernetes
+                  name: etc-kubernetes
+                  readOnly: true
+                - mountPath: /usr/local/mount-from-host/bin
+                  name: usr-bin
+                  readOnly: true
+                - mountPath: /etc/cni/net.d/
+                  name: etc-cni-netd
+                  readOnly: true
+                - mountPath: /opt/cni/bin/
+                  name: opt-cni-bin
+                  readOnly: true
+          hostPID: true
+          restartPolicy: Never
+          volumes:
+            - name: var-lib-cni
+              hostPath:
+                path: /var/lib/cni
+            - hostPath:
+                path: /var/lib/etcd
+              name: var-lib-etcd
+            - hostPath:
+                path: /var/lib/kubelet
+              name: var-lib-kubelet
+            - hostPath:
+                path: /var/lib/kube-scheduler
+              name: var-lib-kube-scheduler
+            - hostPath:
+                path: /var/lib/kube-controller-manager
+              name: var-lib-kube-controller-manager
+            - hostPath:
+                path: /etc/systemd
+              name: etc-systemd
+            - hostPath:
+                path: /lib/systemd
+              name: lib-systemd
+            - hostPath:
+                path: /srv/kubernetes
+              name: srv-kubernetes
+            - hostPath:
+                path: /etc/kubernetes
+              name: etc-kubernetes
+            - hostPath:
+                path: /usr/bin
+              name: usr-bin
+            - hostPath:
+                path: /etc/cni/net.d/
+              name: etc-cni-netd
+            - hostPath:
+                path: /opt/cni/bin/
+              name: opt-cni-bin

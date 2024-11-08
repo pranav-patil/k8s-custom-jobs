@@ -169,35 +169,38 @@ resource "aws_instance" "ec2_instance" {
   }
 }
 
-# resource "null_resource" "setup_k8s_cluster" {
-#   depends_on = [aws_instance.ec2_instance]
-#
-#   connection {
-#     type        = "ssh"
-#     host        = aws_instance.ec2_instance.public_ip
-#     user        = "ubuntu"
-#     private_key = file(local_file.ssh_private_key.filename)
-#     timeout     = "4m"
-#   }
-#
-#   # wait to reboot and "handle it"
-#   provisioner "remote-exec" {
-#     on_failure = continue
-#     inline = [
-#       "set -o errexit",
-#       "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
-#     ]
-#   }
-#
-#   provisioner "file" {
-#     source      = "init.sh"
-#     destination = "/home/ubuntu/init.sh"
-#   }
-#
-#   provisioner "remote-exec" {
-#     inline = [
-#       "chmod +x /home/ubuntu/init.sh",
-#       "sudo sh /home/ubuntu/init.sh"
-#     ]
-#   }
-# }
+resource "null_resource" "setup_k8s_cluster" {
+  depends_on = [aws_instance.ec2_instance]
+
+  connection {
+    type        = "ssh"
+    host        = aws_instance.ec2_instance.public_ip
+    user        = "ubuntu"
+    private_key = file(local_file.ssh_private_key.filename)
+    timeout     = "5m"
+  }
+
+  #   # wait to reboot and "handle it"
+  provisioner "remote-exec" {
+    on_failure = continue
+    inline = [
+      "set -o errexit",
+      "echo 'Waiting for cloud-init to finish and instance to reboot...' ",
+      "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 5; done",
+      "echo 'Waiting for instance to become accessible via SSH after reboot...' ",
+      "until nc -zv localhost 22; do sleep 5; done",
+    ]
+  }
+
+  provisioner "file" {
+    source      = "init.sh"
+    destination = "/home/ubuntu/init.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo chmod +x /home/ubuntu/init.sh",
+      "sh /home/ubuntu/init.sh"
+    ]
+  }
+}

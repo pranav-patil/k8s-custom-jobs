@@ -1,11 +1,55 @@
-DOCS_IMAGE_VERSION="v1.11.0"
+# Charts's path relative to the current directory.
+CHARTS_DIR := charts
+CHARTS := $(filter-out ./$(CHARTS_DIR)/packages, $(wildcard ./$(CHARTS_DIR)/*))
+CHARTS_NAMES := $(notdir $(CHARTS))
+TARGET_NAMESPACE := emprovise-system
 
+DOCS_IMAGE_VERSION="v1.11.0"
 LINT_IMAGE_VERSION="v3.8.0"
 
-# Charts's path relative to the current directory.
-CHARTS := $(wildcard ./charts/*)
+# Add third-party repos
+.PHONY: add-repos
+add-repos:
+	helm repo add falcosecurity https://falcosecurity.github.io/charts
+	helm repo update
 
-CHARTS_NAMES := $(notdir $(CHARTS))
+# Lint all charts
+.PHONY: lint
+lint:
+	echo $(CHARTS_NAMES)
+
+# Package all charts
+.PHONY: package
+package:
+	@for chart in $(CHARTS); do \
+		if [ -d "$$chart" ]; then \
+			echo "Packaging $$chart..."; \
+			helm package "$$chart" --destination $(CHARTS_DIR)/packages; \
+		fi; \
+	done
+
+# Deploy all charts
+.PHONY: deploy
+deploy:
+	@for chart in $(CHARTS_DIR)/packages/*.tgz; do \
+		release_name=$$(basename $$chart .tgz | sed -E 's/-[0-9]+(\.[0-9]+)*$$//'); \
+  		echo "Deploying $$chart as release $$release_name..."; \
+  		helm upgrade --install --namespace $(TARGET_NAMESPACE) --create-namespace \
+  		$$release_name $$chart; \
+	done
+
+# Clean up packaged charts
+.PHONY: clean
+clean:
+	rm -rf $(CHARTS_DIR)/packages/*.tgz
+
+.PHONY: uninstall
+uninstall:
+	@for chart in $(CHARTS_DIR)/packages/*.tgz; do \
+		release_name=$$(basename $$chart .tgz | sed -E 's/-[0-9]+(\.[0-9]+)*$$//'); \
+		echo "Uninstalling release $$release_name..."; \
+		helm uninstall "$$release_name" --namespace $(TARGET_NAMESPACE) || echo "Release $$release_name not found"; \
+    done
 
 .PHONY: lint
 lint: helm-deps-update $(addprefix lint-, $(CHARTS_NAMES))

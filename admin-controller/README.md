@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This repo is the Oversight Controller in Cloud One Container Security.
+Admin Controller is a Kubernetes Hook which initiates Kube Bench scanning for Kubernetes clusters.
 [envtest](https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/envtest) is a testing environment that is provided by the [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) project.
 Kubebuilder uses [envtest](https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/envtest) to create a local Kubernetes API server, instantiate and run the controllers, and uses [Ginkgo](http://onsi.github.io/ginkgo/) as testing framework, [Gomega](https://onsi.github.io/gomega/) as matcher/assertion library.
 
