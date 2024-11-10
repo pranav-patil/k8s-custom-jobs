@@ -149,7 +149,7 @@ TLS configuration - TLS cipher suites
 {{- end }}
 
 {{/*
-Compliance Scan Job Selector labels
+Kube Bench Job Selector labels
 */}}
 {{- define "kubeBenchJob.selectorLabels" -}}
 app.kubernetes.io/name: kube-bench-job

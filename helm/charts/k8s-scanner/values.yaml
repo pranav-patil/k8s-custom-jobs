@@ -25,7 +25,7 @@ serviceAccount:
 
   adminController:
     ## The name of the service account to use.
-    ## If not set and create is true, a name is generated using the fullname of oversight template
+    ## If not set and create is true, a name is generated using the fullname of admin controller template
     name: 'admin-controller'
 
     ## Annotations to add to the service account
@@ -251,28 +251,11 @@ priorityClassName:
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 images:
   defaults:
-    ## Default registry to pull images from. This can be overridden for
-    ## each image by specifying the registry attribute at the image level.
-    ## If no registry is provided, images will be pulled from your default
-    ## registry (which may be Amazon ECR Public Gallery).
-    ##
-    ## The images can also be accessed in Docker Hub by leaving the registry field blank.
-    # registry:
-    ##
-    ## Default value: public.ecr.aws
-    registry: public.ecr.aws
-
     repository: nginx
-
-    ## Default project / organization to pull images from. This can be
-    ## overridden for each image by specifying the project attribute at the
-    ## image level.
-    ##
-    project: emprovise/k8s-custom-jobs
 
     ## Default tag for images to pull. This can be overridden for each image
     ## by specifying the tag attribute at the image level.
-    tag: 1.0.0
+    tag:
 
     ## Default pull policy for images. This can be overridden for each image
     ## by specifying the pullPolicy attribute at the image level.
@@ -280,14 +263,14 @@ images:
     ## Default value: IfNotPresent
     pullPolicy: IfNotPresent
 
-    ## Default secret for pulling images. This can be overridden for each
-    ## image by specifying the imagePullSecret attribute at the image level.
-    ##
-    ## Default value: none
-    # imagePullSecret:
   adminController:
+    registry: 012345678901.dkr.ecr.us-east-1.amazonaws.com
+    pullPolicy: Always
+    project: emprovise
     repository: admin-controller
-    digest: sha256:834c63f071e0a2aac5ae9d694106966bbe3dcea557234edefbb781904cec869d
+    tag: latest
+    digest:
+    imagePullSecret: ecr-secret
 
 adminController:
   enabled: true
@@ -306,7 +289,7 @@ adminController:
   ##
   pageSize: 100
 
-  ## enableNetworkPolicyCreation will tell the Oversight controller to create the Kubernetes network policy if it doesn't exist.
+  ## enableNetworkPolicyCreation will tell the Admin controller to create the Kubernetes network policy if it doesn't exist.
   ## The created network policy is used to perform `isolate` mitigation. The created network policy will not get cleaned up automatically.
   ##
   ## Default value: true

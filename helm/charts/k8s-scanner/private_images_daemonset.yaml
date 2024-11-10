@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: private-images-pull-admin-controller
+  namespace: emprovise-system
+  labels:
+    k8s-app: private-images-pull-admin-controller-app
+spec:
+  selector:
+    matchLabels:
+      name: private-images-pull-admin-controller-pods
+  template:
+    metadata:
+      labels:
+        name: private-images-pull-admin-controller-pods
+    spec:
+      # admin controller runs on worker nodes only, no need to adjust tolerations
+      # BUT: due to https://github.com/loft-sh/vcluster/issues/132 daemonset still tries to create pods on control plane but fails due to taints not tolerated; sounds crazy
+      # this causes private-images-pull-admin-controller-pods to be created on tainted node
+      containers:
+        - name: private-images-pull-admin-controller-pods
+          image: 012345678901.dkr.ecr.us-east-1.amazonaws.com/emprovise/admin-controller:latest
+      imagePullSecrets:
+        - name: ecr-secret
+      terminationGracePeriodSeconds: 30

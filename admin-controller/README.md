@@ -92,21 +92,35 @@ make run
 ```
 
 ```
-$ make dev-build IMG=<some-registry>/<project-name>:tag
+make dev-build IMG=<some-registry>/<project-name>:tag
 ```
 
 #### Multi-platform
-```
-# create a builder instance, only needs to be executed once
-$ docker buildx create --use --name multi-platform --driver docker-container
 
-$ make build IMG=<some-registry>/<project-name>:tag
+Create a builder instance, only needs to be executed once
+
+```
+docker buildx create --use --name multi-platform --driver docker-container
+make build IMG=<some-registry>/<project-name>:tag
 ```
 
 ### Push to the registry
 
+Docker push images
+**NOTE**: Replace the example AWS Account ID `012345678901` to set the `AWS_ACCOUNT_ID` environment variable.
+
 ```
-$ make docker-push IMG=<some-registry>/<project-name>:tag
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=012345678901
+
+aws sts get-caller-identity --region $AWS_REGION
+
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/emprovise/admin-controller"
+
+docker tag emprovise/admin-controller:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/emprovise/admin-controller:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/emprovise/admin-controller:latest
+
+make docker-push IMG=<some-registry>/<project-name>:tag
 ```
 
 ### How to deploy in the cluster
@@ -114,7 +128,7 @@ $ make docker-push IMG=<some-registry>/<project-name>:tag
 Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 
 ```
-$ make deploy IMG=<some-registry>/<project-name>:tag
+make deploy IMG=<some-registry>/<project-name>:tag
 ```
 
 ### How to test
@@ -122,5 +136,5 @@ $ make deploy IMG=<some-registry>/<project-name>:tag
 `make docker-build` includes running test already. If you'd like to run in your local, you have to have [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) installed.
 
 ```
-$ make test
+make test
 ```

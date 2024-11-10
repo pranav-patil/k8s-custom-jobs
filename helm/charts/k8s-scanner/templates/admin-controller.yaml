@@ -52,10 +52,6 @@ spec:
         volumeMounts:
           - name: workdir
             mountPath: /var/adminController
-          - name: api-key
-            mountPath: /secrets
-          - name: kube-bench-job-template
-            mountPath: /etc/config
         args:
         - --tls-min-version={{ include "tlsConfig.minTLSVersion" .Values.tlsConfig }}
         - --tls-cipher-suites={{ include "tlsConfig.cipherSuites" .Values.tlsConfig }}

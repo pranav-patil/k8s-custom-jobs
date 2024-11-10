@@ -27,7 +27,36 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/manager /manager
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
+
+# See https://github.com/projectatomic/ContainerApplicationGenericLabels
+LABEL vcs-ref="[COMMIT]" \
+    vcs-type="git" \
+    build-date="[BUILDTIME]" \
+    vendor="Emprovise Inc" \
+    distribution-scope="private"
+
+FROM builder as tester
+
+RUN mkdir -p /build/test-results/
+WORKDIR /build/test-results/
+
+RUN --mount=type=cache,mode=0777,id=gocache,target=/root/.cache/go-build \
+    --mount=type=cache,mode=0777,id=gomodcache,target=/go/pkg/mod \
+    go install github.com/jstemmer/go-junit-report@latest && \
+    go install github.com/securego/gosec/v2/cmd/gosec@latest && \
+    go install honnef.co/go/tools/cmd/staticcheck@latest
+
+# Unit tests with coverage report
+RUN (go test -v --cover ../... 2>&1 && touch .tests-passed) | tee unit-test-output.txt
+RUN go-junit-report < unit-test-output.txt > junit-report.xml
+
+# Static analysis
+# If either of these steps fail, remove the 'tests-passed' marker
+RUN --mount=type=cache,mode=0777,id=gocache,target=/root/.cache/go-build \
+    --mount=type=cache,mode=0777,id=gomodcache,target=/go/pkg/mod \
+    /go/bin/gosec ../... 2>/dev/null || (rm -f .tests-passed && echo "Gosec scan failed") && \
+    /go/bin/staticcheck ../... || (rm -f .tests-passed && echo "Staticcheck scan failed")

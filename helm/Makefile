@@ -15,8 +15,18 @@ add-repos:
 
 # Lint all charts
 .PHONY: lint
-lint:
-	echo $(CHARTS_NAMES)
+lint: helm-deps-update $(addprefix lint-, $(CHARTS_NAMES))
+
+lint-%:
+	@docker run \
+	-it \
+	-e HOME=/home/ct \
+	--mount type=tmpfs,destination=/home/ct \
+	--workdir=/data \
+	--volume $$(pwd):/data \
+	-u $$(id -u) \
+	quay.io/helmpack/chart-testing:$(LINT_IMAGE_VERSION) \
+	ct lint --config ./ct.yaml --charts ./charts/$*
 
 # Package all charts
 .PHONY: package
@@ -30,13 +40,16 @@ package:
 
 # Deploy all charts
 .PHONY: deploy
-deploy:
+deploy: add-repos
 	@for chart in $(CHARTS_DIR)/packages/*.tgz; do \
 		release_name=$$(basename $$chart .tgz | sed -E 's/-[0-9]+(\.[0-9]+)*$$//'); \
   		echo "Deploying $$chart as release $$release_name..."; \
   		helm upgrade --install --namespace $(TARGET_NAMESPACE) --create-namespace \
   		$$release_name $$chart; \
 	done
+
+	helm install falco falcosecurity/falco --create-namespace --namespace falco
+
 
 # Clean up packaged charts
 .PHONY: clean
@@ -51,19 +64,8 @@ uninstall:
 		helm uninstall "$$release_name" --namespace $(TARGET_NAMESPACE) || echo "Release $$release_name not found"; \
     done
 
-.PHONY: lint
-lint: helm-deps-update $(addprefix lint-, $(CHARTS_NAMES))
+	helm uninstall falco --namespace falco
 
-lint-%:
-	@docker run \
-	-it \
-	-e HOME=/home/ct \
-	--mount type=tmpfs,destination=/home/ct \
-	--workdir=/data \
-	--volume $$(pwd):/data \
-	-u $$(id -u) \
-	quay.io/helmpack/chart-testing:$(LINT_IMAGE_VERSION) \
-	ct lint --config ./ct.yaml --charts ./charts/$*
 
 .PHONY: docs
 docs: $(addprefix docs-, $(CHARTS_NAMES))

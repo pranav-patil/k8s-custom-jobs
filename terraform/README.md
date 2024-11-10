@@ -6,9 +6,13 @@ Below are standard terraform commands to setup any cluster type. Follow the addi
     terraform plan
     terraform apply -auto-approve -input=false
 
-After cluster creation is complete setup `ecr-secret` to pull docker images from AWS ECR.
+Create AWS ECR using the `aws/ecr` terraform scripts. After cluster creation is complete setup `ecr-secret` to pull docker images from AWS ECR.
+**NOTE**: Replace the example AWS Account ID `012345678901` to set the `AWS_ACCOUNT_ID` environment variable.
 
-    aws sts get-caller-identity --region <AWS_REGION>
+    export AWS_REGION=us-east-1
+    export AWS_ACCOUNT_ID=012345678901
+
+    aws sts get-caller-identity --region $AWS_REGION
 
     kubectl create namespace emprovise-system
 
@@ -16,9 +20,9 @@ After cluster creation is complete setup `ecr-secret` to pull docker images from
     
     kubectl create secret \
     docker-registry ecr-secret \
-    --docker-server="<AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com" \
+    --docker-server="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" \
     --docker-username=AWS \
-    --docker-password="$(aws ecr get-login-password --region us-east-1)" \
+    --docker-password="$(aws ecr get-login-password --region $AWS_REGION)" \
     --docker-email=emprovise@gmail.com \
     --namespace emprovise-system
 
